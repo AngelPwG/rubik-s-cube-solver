@@ -1,5 +1,9 @@
 # Rubik's Cube Solver
 
+<p align="center">
+  <img src="./assets/larp-maxing-girl.png" width="900">
+</p>
+
 C++ cube logic and BFS/A* compiled to WebAssembly, with an HTML/CSS/Three.js frontend.
 
 ## Start on NixOS
