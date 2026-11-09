@@ -2,7 +2,6 @@
 
 namespace rubiks {
 
-void passColumn
 void passColumn(int column, Face& rec, const Face& pas, bool reversed = false){
 	if (!reversed)
 	for (int i = 0; i < 3; ++i)
@@ -76,27 +75,54 @@ Cube applyMove(const Cube& cube, Move move){
 			rotateFace(false, next.up);
 			break;
 		case Move::D:
-			next.front[0] = cube.left[0];
-			passReversedRow(0, next.back, cube.right);
-			passReversedRow(0, next.left, cube.back);
-			next.right[0] = cube.front[0];
+			next.front[2] = cube.left[2];
+			passReversedRow(2, next.back, cube.right);
+			passReversedRow(2, next.left, cube.back);
+			next.right[2] = cube.front[2];
 			rotateFace(true, next.down);
 			break;
 		case Move::Di:
-			next.front[0] = cube.right[0];
-			passReversedRow(0, next.back, cube.left);
-			next.left[0] = cube.front[0];
-			passReversedRow(0, next.right, cube.back);
-			rotateFace(false, next.up);
+			next.front[2] = cube.right[2];
+			passReversedRow(2, next.back, cube.left);
+			next.left[2] = cube.front[2];
+			passReversedRow(2, next.right, cube.back);
+			rotateFace(false, next.down);
 			break;
 		case Move::F:
-
+			for (int i = 0; i < 3; ++i) {
+				next.right[i][0] = cube.up[2][i];
+				next.down[0][i] = cube.right[2 - i][0];
+				next.left[i][2] = cube.down[0][i];
+				next.up[2][i] = cube.left[2 - i][2];
+			}
+			rotateFace(true, next.front);
 			break;
 		case Move::Fi:
+			for (int i = 0; i < 3; ++i) {
+				next.right[i][0] = cube.down[0][2 - i];
+				next.down[0][i] = cube.left[i][2];
+				next.left[i][2] = cube.up[2][2 - i];
+				next.up[2][i] = cube.right[i][0];
+			}
+			rotateFace(false, next.front);
 			break;
 		case Move::B:
+			for (int i = 0; i < 3; ++i) {
+				next.left[i][0] = cube.up[0][2 - i];
+				next.down[2][i] = cube.left[i][0];
+				next.right[i][2] = cube.down[2][2 - i];
+				next.up[0][i] = cube.right[i][2];
+			}
+			rotateFace(false, next.back);
 			break;
 		case Move::Bi:
+			for (int i = 0; i < 3; ++i) {
+				next.up[0][i] = cube.left[2 - i][0];
+				next.left[i][0] = cube.down[2][i];
+				next.down[2][i] = cube.right[2 - i][2];
+				next.right[i][2] = cube.up[0][i];
+			}
+			rotateFace(true, next.back);
 			break;
 		default:
 		 	break;
