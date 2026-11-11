@@ -42,7 +42,7 @@ std::vector<Move> solveAStar (const Cube& start){
 
         Cube curCube = nodes[idx].cube;
         int curG = nodes[idx].g;
-        std::string_key = stateKey(curCube);
+        std::string key = stateKey(curCube);
         if (closed.count(key)) continue;
         closed.insert(key);
         if(isSolved(curCube)) {
