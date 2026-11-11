@@ -38,7 +38,7 @@ extern "C" WEB_EXPORT const char* solve_cube(const char* key, int algorithm,
     if (!key || !cubeFromKey(key, cube))
         return "{\"status\":\"error\",\"message\":\"Estado o colores invalidos\"}";
     if ((algorithm != 0 && algorithm != 1) || maxExpandedNodes < 0 ||
-        maxExpandedNodes > 250000 || !std::isfinite(maxTimeMs) || maxTimeMs < 0 || maxTimeMs > 60000)
+        maxExpandedNodes > 1000000 || !std::isfinite(maxTimeMs) || maxTimeMs < 0 || maxTimeMs > 60000)
         return "{\"status\":\"error\",\"message\":\"Algoritmo o limites invalidos\"}";
     const rubiks::SearchLimits limits{static_cast<std::size_t>(maxExpandedNodes), maxTimeMs};
 #ifdef RUBIK_ASTAR_ONLY

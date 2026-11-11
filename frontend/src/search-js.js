@@ -19,7 +19,7 @@
 import { MOVE_NAMES, PERMUTATIONS, isSolved } from './cube-model.js';
 
 /** Límites por defecto de una búsqueda (mismos campos que SearchLimits en C++). */
-export const DEFAULT_LIMITS = { maxExpandedNodes: 150000, maxTimeMs: 10000 };
+export const DEFAULT_LIMITS = { maxExpandedNodes: 1000000, maxTimeMs: 10000 };
 
 /** Cada cuántos nodos expandidos se revisa el reloj (revisarlo siempre es lento). */
 const TIME_CHECK_INTERVAL = 512;

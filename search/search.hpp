@@ -6,8 +6,8 @@
 namespace rubiks {
 enum class SearchStatus { Solved, LimitReached, Exhausted };
 struct SearchLimits {
-    std::size_t maxExpandedNodes = 100000;
-    double maxTimeMs = 5000.0;
+    std::size_t maxExpandedNodes = 1000000;
+    double maxTimeMs = 10000.0;
 };
 struct SearchResult {
     SearchStatus status = SearchStatus::LimitReached;
