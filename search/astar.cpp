@@ -1,68 +1,55 @@
 #include "search.hpp"
-#include <vector>
+#include "search_internal.hpp"
 #include <queue>
-#include <string>
-#include <unordered_set>
-#include <algorithm>
-// TODO: Implement solveAStar in namespace rubiks, with lowest f score first.
+#include <unordered_map>
 
-namespace rubiks{
+namespace rubiks {
 namespace {
-    
-    struct Node {
-        Cube cube;
-        int g;
-        int f;
-        int parent;
-        Move move;
-    };
-
-    struct OpenEntry {
-        int f;
-        int index;
-    };
-
-    struct CompareOpen {
-        bool operator()(const OpenEntry& a, const OpenEntry& b) const {
-            return a.f  > b.f;
-        }
-    };
+struct Node { Cube cube; int g; std::size_t parent; Move move; };
+struct OpenEntry { int f; std::size_t index; };
+struct CompareOpen {
+    bool operator()(const OpenEntry& a, const OpenEntry& b) const {
+        return a.f != b.f ? a.f > b.f : a.index > b.index;
+    }
+};
 }
-
-std::vector<Move> solveAStar (const Cube& start){
-    std::vector<Node> nodes;
+SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
+    const auto start = detail::Clock::now();
+    SearchResult result;
+    std::vector<Node> nodes{{initial, 0, static_cast<std::size_t>(-1), Move::R}};
     std::priority_queue<OpenEntry, std::vector<OpenEntry>, CompareOpen> open;
-    std::unordered_set<std::string> closed;
-    nodes.push_back({start, 0, heuristic(start), -1, Move::R});
-    open.push({nodes[0].f, 0});
-
-    while(!open.empty()){
-        int idx = open.top().index;
+    std::unordered_map<std::string, int> bestG{{stateKey(initial), 0}};
+    open.push({heuristic(initial), 0});
+    while (!open.empty()) {
+        const auto current = open.top().index;
         open.pop();
-
-        Cube curCube = nodes[idx].cube;
-        int curG = nodes[idx].g;
-        std::string_key = stateKey(curCube);
-        if (closed.count(key)) continue;
-        closed.insert(key);
-        if(isSolved(curCube)) {
-            std::vector<Move> path;
-            for(int i = idx; nodes[i].parent != -1; i = nodes[i].parent)
-                path.push_back(nodes[i].move);
-            std::reverse(path.begin(), path.end());
-            return path;
+        const Node node = nodes[current];
+        const auto key = stateKey(node.cube);
+        if (node.g != bestG.at(key)) continue;
+        if (isSolved(node.cube)) {
+            detail::reconstructPath(result, nodes, current);
+            result.searchTimeMs = detail::elapsedMs(start);
+            return result;
         }
-
-        for(Move m : allowedMoves) {
-            Cube next = applyMove(curCube, m);
-            if(closed.count(stateKey(next))) continue;
-            int g = curG + 1;
-            int f = g + heuristic(next);
-            nodes.push_back({next, g, f, idx,m});
-            open.push({f, static_cast<int>(nodes.size()) - 1});
+        if (detail::limitReached(result, limits, start)) {
+            result.searchTimeMs = detail::elapsedMs(start);
+            return result;
+        }
+        ++result.expandedNodes;
+        for (Move move : allowedMoves) {
+            Cube next = applyMove(node.cube, move);
+            const auto nextKey = stateKey(next);
+            const int g = node.g + 1;
+            const auto previous = bestG.find(nextKey);
+            if (previous != bestG.end() && previous->second <= g) continue;
+            bestG[nextKey] = g;
+            const int f = g + heuristic(next);
+            nodes.push_back({next, g, current, move});
+            open.push({f, nodes.size() - 1});
         }
     }
-    return{};
+    result.status = SearchStatus::Exhausted;
+    result.searchTimeMs = detail::elapsedMs(start);
+    return result;
 }
-
 }

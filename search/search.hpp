@@ -17,8 +17,7 @@ struct SearchResult {
     int solutionCost = 0;
 };
 
-// Declarations only; the suggested limits are starting values to calibrate.
 SearchResult solveBFS(const Cube& initial, const SearchLimits& limits);
 SearchResult solveAStar(const Cube& initial, const SearchLimits& limits);
 int heuristic(const Cube& cube);
-} // namespace rubiks
+}
