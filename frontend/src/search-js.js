@@ -14,12 +14,14 @@
  *   - Devuelven la misma información que SearchResult en search/search.hpp.
  *
  * "Nodo expandido" = nodo que se sacó de la frontera y al que se le generaron
- * sus 12 hijos.
+ * sucesores; puede detenerse durante la expansión por el límite de almacenamiento.
  */
 import { MOVE_NAMES, PERMUTATIONS, isSolved } from './cube-model.js';
 
 /** Límites por defecto de una búsqueda (mismos campos que SearchLimits en C++). */
-export const DEFAULT_LIMITS = { maxExpandedNodes: 1000000, maxTimeMs: 10000 };
+export const DEFAULT_LIMITS = {
+  maxExpandedNodes: 1000000, maxTimeMs: 10000, maxStoredStates: 1000000,
+};
 
 /** Cada cuántos nodos expandidos se revisa el reloj (revisarlo siempre es lento). */
 const TIME_CHECK_INTERVAL = 512;
@@ -114,6 +116,10 @@ export function solveBFS(startKey, limits = DEFAULT_LIMITS) {
     for (let m = 0; m < 12; m++) {
       const next = applyMoveIndex(key, m);
       if (visited.has(next)) continue; // ya se llegó a este estado por otro camino
+      if (keys.length >= (limits.maxStoredStates ?? DEFAULT_LIMITS.maxStoredStates)) {
+        return { ...makeResult('limit', [], expanded, startTime), limitReason: 'states',
+          storedStates: keys.length, warning: 'Se alcanzó el límite de estados almacenados del motor JavaScript.' };
+      }
       visited.add(next);
       keys.push(next);
       parent.push(current);
@@ -224,6 +230,10 @@ export function solveAStar(startKey, limits = DEFAULT_LIMITS) {
     for (let m = 0; m < 12; m++) {
       const next = applyMoveIndex(key, m);
       if (closed.has(next)) continue;
+      if (keys.length >= (limits.maxStoredStates ?? DEFAULT_LIMITS.maxStoredStates)) {
+        return { ...makeResult('limit', [], expanded, startTime), limitReason: 'states',
+          storedStates: keys.length, warning: 'Se alcanzó el límite de estados almacenados del motor JavaScript.' };
+      }
       keys.push(next);
       g.push(childG);
       f.push(childG + heuristic(next));

@@ -58,6 +58,9 @@ extern "C" WEB_EXPORT const char* solve_cube(const char* key, int algorithm,
     output = std::string("{\"status\":\"") + status + "\",\"moves\":\"" + moves +
         "\",\"expandedNodes\":" + std::to_string(result.expandedNodes) +
         ",\"searchTimeMs\":" + std::to_string(result.searchTimeMs) +
-        ",\"solutionCost\":" + std::to_string(result.solutionCost) + "}";
+        ",\"solutionCost\":" + std::to_string(result.solutionCost) +
+        ",\"storedStates\":" + std::to_string(result.storedStates) +
+        ",\"maxStoredStates\":" + std::to_string(limits.maxStoredStates) +
+        ",\"limitReason\":\"" + result.limitReason + "\"}";
     return output.c_str();
 }

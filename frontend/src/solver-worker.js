@@ -15,13 +15,14 @@
  * Mensajes que envía:   { type: 'ready', engine }
  *                       { type: 'result', id, result }
  */
-import { solveWithJs } from './search-js.js';
+import { solveWithJs } from './search-js.js?v=resources-1';
 
 /** Código numérico de cada algoritmo en la función C++ solve_cube(). */
 const ALGORITHM_CODE = { bfs: 0, astar: 1 };
 
 /** Módulo de Emscripten ya inicializado, o null si se usa el respaldo en JS. */
 let wasmModule = null;
+let needsWasmReload = false;
 
 /**
  * Intenta cargar el solver en WebAssembly.
@@ -77,6 +78,19 @@ function solveWithWasm(algorithm, key, limits) {
     expandedNodes: Number(raw.expandedNodes),
     searchTimeMs: Number(raw.searchTimeMs),
     solutionCost: Number(raw.solutionCost ?? moves.length),
+    storedStates: Number(raw.storedStates ?? 0),
+    limitReason: raw.limitReason ?? '',
+    ...(raw.limitReason === 'states' ? {
+      warning: `Se alcanzó el límite de ${Number(raw.maxStoredStates).toLocaleString('es-MX')} estados almacenados. La búsqueda se detuvo en C++/WebAssembly para acotar el consumo de memoria.`,
+    } : {}),
+  };
+}
+
+function wasmFailure(error) {
+  return {
+    status: 'error', engine: 'wasm', moves: [], solutionCost: null,
+    expandedNodes: null, searchTimeMs: null,
+    warning: `La ejecución C++/WebAssembly falló (${error.message}). No se repitió la búsqueda en JavaScript; no hay métricas válidas para esta ejecución.`,
   };
 }
 
@@ -90,16 +104,24 @@ self.onmessage = async (event) => {
   await enginePromise;
 
   let result;
+  if (needsWasmReload) {
+    // A module that aborted must not be reused by the next algorithm.
+    wasmModule = null;
+    await loadEngine();
+    needsWasmReload = false;
+    if (!wasmModule) {
+      result = wasmFailure(new Error('No se pudo reiniciar el módulo'));
+      self.postMessage({ type: 'result', id, result: { ...result, algorithm } });
+      return;
+    }
+  }
   if (wasmModule) {
     try {
       result = { ...solveWithWasm(algorithm, key, limits), engine: 'wasm' };
     } catch (error) {
-      // Si el Wasm falla, la interfaz sigue funcionando y avisa qué pasó.
-      result = {
-        ...solveWithJs(algorithm, key, limits),
-        engine: 'js',
-        warning: `El solver de WebAssembly falló (${error.message}). Se usó el respaldo en JavaScript.`,
-      };
+      console.error('La búsqueda C++/WebAssembly falló:', error);
+      needsWasmReload = true;
+      result = wasmFailure(error);
     }
   } else {
     result = { ...solveWithJs(algorithm, key, limits), engine: 'js' };

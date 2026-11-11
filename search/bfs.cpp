@@ -13,6 +13,7 @@ struct Node { Cube cube; std::size_t parent; Move move; };
 SearchResult solveBFS(const Cube& initial, const SearchLimits& limits) {
     const auto start = detail::Clock::now();
     SearchResult result;
+    result.storedStates = 1;
 
     std::vector<Node> nodes{{initial, static_cast<std::size_t>(-1), Move::R}};
     std::queue<std::size_t> open;       
@@ -37,8 +38,15 @@ SearchResult solveBFS(const Cube& initial, const SearchLimits& limits) {
         ++result.expandedNodes;
         for (Move move : allowedMoves) {
             Cube next = applyMove(node, move);
-            if (!visited.insert(stateKey(next)).second) continue;
+            const auto key = stateKey(next);
+            if (visited.count(key)) continue;
+            if (detail::storedLimitReached(result, limits, nodes.size())) {
+                result.searchTimeMs = detail::elapsedMs(start);
+                return result;
+            }
+            visited.insert(key);
             nodes.push_back({next, current, move});
+            result.storedStates = nodes.size();
             open.push(nodes.size() - 1);
         }
     }

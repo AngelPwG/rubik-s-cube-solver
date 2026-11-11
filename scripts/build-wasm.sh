@@ -16,5 +16,5 @@ em++ -std=c++17 -O2 -Wall -Wextra \
   bindings/wasm.cpp "${extra_flags[@]}" \
   --no-entry -sMODULARIZE=1 -sEXPORT_ES6=1 \
   -sEXPORTED_FUNCTIONS=_solve_cube -sENVIRONMENT=web,worker,node \
-  -sEXPORTED_RUNTIME_METHODS=ccall -sALLOW_MEMORY_GROWTH=1 \
+  -sEXPORTED_RUNTIME_METHODS=ccall -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=1 \
   -o frontend/public/wasm/solver.js

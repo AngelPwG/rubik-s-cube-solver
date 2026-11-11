@@ -16,6 +16,7 @@ struct CompareOpen {
 SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
     const auto start = detail::Clock::now();
     SearchResult result;
+    result.storedStates = 1;
     std::vector<Node> nodes{{initial, 0, static_cast<std::size_t>(-1), Move::R}};
     std::priority_queue<OpenEntry, std::vector<OpenEntry>, CompareOpen> open;
     std::unordered_map<std::string, int> bestG{{stateKey(initial), 0}};
@@ -42,9 +43,14 @@ SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
             const int g = node.g + 1;
             const auto previous = bestG.find(nextKey);
             if (previous != bestG.end() && previous->second <= g) continue;
+            if (detail::storedLimitReached(result, limits, nodes.size())) {
+                result.searchTimeMs = detail::elapsedMs(start);
+                return result;
+            }
             bestG[nextKey] = g;
             const int f = g + heuristic(next);
             nodes.push_back({next, g, current, move});
+            result.storedStates = nodes.size();
             open.push({f, nodes.size() - 1});
         }
     }

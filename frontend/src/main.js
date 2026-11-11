@@ -18,7 +18,7 @@ import {
 import { CubeView } from './cube-view.js';
 import { CubeNet } from './cube-net.js';
 import { SolverClient } from './solver-client.js';
-import { DEFAULT_LIMITS } from './search-js.js';
+import { DEFAULT_LIMITS } from './search-js.js?v=resources-1';
 
 const ALGORITHM_NAME = { bfs: 'BFS', astar: 'A*' };
 const STATUS_TEXT = {
@@ -27,6 +27,7 @@ const STATUS_TEXT = {
   exhausted: 'Sin solución',
   invalid: 'Solución inválida',
   cancelled: 'Cancelado',
+  error: 'Error de ejecución',
 };
 const SCRAMBLE_TURN_MS = 160; // duración de cada giro al mezclar
 const MANUAL_TURN_MS = 260;   // duración de un giro hecho a mano
@@ -335,7 +336,8 @@ function renderResults() {
     row.dataset.status = isRunning ? 'running' : (result?.status ?? 'idle');
     row.classList.toggle('is-shown', state.solution?.algorithm === algorithm);
     cell('status').textContent = isRunning ? 'Buscando…' : (result ? STATUS_TEXT[result.status] : 'Sin ejecutar');
-    const hasNumbers = result && result.status !== 'cancelled';
+    const hasNumbers = result && result.status !== 'cancelled' && Number.isFinite(result.expandedNodes) && Number.isFinite(result.searchTimeMs);
+    cell('engine').textContent = result?.engine === 'wasm' ? 'C++ / Wasm' : result?.engine === 'js' ? 'JavaScript' : '';
     cell('cost').textContent = result?.status === 'solved' ? result.moves.length : '–';
     cell('nodes').textContent = hasNumbers ? numberFormat.format(result.expandedNodes) : '–';
     cell('time').textContent = hasNumbers ? formatTime(result.searchTimeMs) : '–';
@@ -344,13 +346,16 @@ function renderResults() {
   $('summary').textContent = compareResults();
   $('limits-note').textContent =
     `Límite por búsqueda: ${numberFormat.format(DEFAULT_LIMITS.maxExpandedNodes)} nodos expandidos ` +
-    `o ${DEFAULT_LIMITS.maxTimeMs / 1000} segundos.`;
+    `o ${DEFAULT_LIMITS.maxTimeMs / 1000} segundos. ` +
+    `Además, se almacenan como máximo ${numberFormat.format(DEFAULT_LIMITS.maxStoredStates)} estados; ese límite acota la memoria y también puede detener la búsqueda.`;
 }
 
 /** Frase que compara BFS contra A* cuando hay resultados de los dos. */
 function compareResults() {
   const { bfs, astar } = state.results;
   if (!bfs || !astar) return '';
+  if (bfs.status === 'error' || astar.status === 'error') return 'Una búsqueda falló: no se puede comparar su rendimiento con la otra.';
+  if (bfs.engine !== astar.engine) return 'Los resultados usan motores distintos; no constituyen una comparación de ambos algoritmos en C++.';
   if (bfs.status === 'solved' && astar.status === 'solved') {
     if (bfs.moves.length === 0) return '';
     const fewer = bfs.expandedNodes <= astar.expandedNodes ? bfs : astar;
@@ -364,13 +369,13 @@ function compareResults() {
     return `${sameCost} ${ALGORITHM_NAME[fewer.algorithm]} expandió ${ratioText} veces menos nodos que ${ALGORITHM_NAME[more.algorithm]}.`;
   }
   if (bfs.status === 'limit' && astar.status === 'solved') {
-    return 'BFS llegó al límite sin encontrar solución; A* sí la encontró gracias a la heurística.';
+    return 'BFS alcanzó un límite de recursos; A* encontró una solución dentro de los límites configurados.';
   }
   if (bfs.status === 'solved' && astar.status === 'limit') {
     return 'A* llegó al límite sin encontrar solución; BFS sí la encontró.';
   }
   if (bfs.status === 'limit' && astar.status === 'limit') {
-    return 'Ninguno encontró solución dentro del límite: la mezcla es demasiado profunda.';
+    return 'Ninguno encontró solución dentro de los límites de recursos. Esto no demuestra que el cubo no tenga solución.';
   }
   return '';
 }

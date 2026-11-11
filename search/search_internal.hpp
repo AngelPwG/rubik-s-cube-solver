@@ -8,8 +8,25 @@ inline double elapsedMs(Clock::time_point start) {
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 // Count a node when successor generation begins. Goal nodes are not expanded.
-inline bool limitReached(const SearchResult& r, const SearchLimits& limits, Clock::time_point start) {
-    return r.expandedNodes >= limits.maxExpandedNodes || elapsedMs(start) >= limits.maxTimeMs;
+inline bool limitReached(SearchResult& r, const SearchLimits& limits, Clock::time_point start) {
+    if (r.expandedNodes >= limits.maxExpandedNodes) {
+        r.limitReason = "nodes";
+        return true;
+    }
+    if (elapsedMs(start) >= limits.maxTimeMs) {
+        r.limitReason = "time";
+        return true;
+    }
+    return false;
+}
+inline bool storedLimitReached(SearchResult& r, const SearchLimits& limits,
+                               std::size_t stored) {
+    r.storedStates = stored;
+    if (stored >= limits.maxStoredStates) {
+        r.limitReason = "states";
+        return true;
+    }
+    return false;
 }
 template<class Nodes>
 void reconstructPath(SearchResult& r, const Nodes& nodes, std::size_t goal) {
