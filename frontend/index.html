@@ -1,18 +1,140 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rubik's Cube Solver</title>
+  <title>Solucionador de cubo de Rubik: BFS y A*</title>
   <link rel="stylesheet" href="./src/styles.css">
+  <!-- Three.js se sirve desde vendor/ para que la página funcione sin internet. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.min.js",
+      "three/addons/controls/OrbitControls.js": "./vendor/three/OrbitControls.js"
+    }
+  }
+  </script>
 </head>
 <body>
-  <main>
-    <h1>Rubik's Cube Solver</h1>
-    <p>Project skeleton: implement the cube view and solver controls here.</p>
-    <div id="cube-view" aria-label="Future 3D cube view"></div>
-    <section id="results" aria-live="polite"></section>
-  </main>
+  <div class="app">
+    <header class="masthead">
+      <div>
+        <h1>Solucionador de cubo de Rubik</h1>
+        <p class="masthead-sub">Un agente busca la secuencia de giros más corta con búsqueda ciega (BFS) o informada (A*).</p>
+      </div>
+      <p class="engine" id="engine" title="Motor que ejecuta las búsquedas">Cargando motor de búsqueda…</p>
+    </header>
+
+    <main class="layout">
+      <!-- Columna izquierda: el cubo y la reproducción de la solución -->
+      <div class="stage-column">
+        <section class="stage" aria-label="Cubo">
+          <div class="cube-view" id="cube-view" aria-label="Vista 3D del cubo. Arrastra para girar la cámara."></div>
+          <p class="scramble" id="scramble"></p>
+          <div class="net" id="cube-net" role="img"></div>
+          <button class="ghost camera-reset" id="reset-camera" type="button">Centrar vista</button>
+        </section>
+
+        <section class="playback" aria-labelledby="playback-title">
+          <div class="playback-head">
+            <h2 id="playback-title">Solución paso a paso</h2>
+            <div class="solution-switch" id="solution-switch" hidden>
+              <span>Ver la solución de</span>
+              <button type="button" id="show-bfs" class="ghost" aria-pressed="false">BFS</button>
+              <button type="button" id="show-astar" class="ghost" aria-pressed="false">A*</button>
+            </div>
+            <p class="step-count" id="step-count"></p>
+          </div>
+          <div class="transport">
+            <button type="button" id="step-start" class="ghost">Inicio</button>
+            <button type="button" id="step-prev" class="ghost">Anterior</button>
+            <button type="button" id="step-play" class="primary">Reproducir</button>
+            <button type="button" id="step-next" class="ghost">Siguiente</button>
+            <label class="speed">
+              <span>Velocidad</span>
+              <select id="speed">
+                <option value="800">Lenta</option>
+                <option value="450" selected>Normal</option>
+                <option value="200">Rápida</option>
+              </select>
+            </label>
+          </div>
+          <ol class="moves" id="solution-moves" aria-label="Giros de la solución"></ol>
+          <p class="hint" id="solution-hint">Mezcla el cubo y resuélvelo para ver aquí cada giro de la solución.</p>
+        </section>
+      </div>
+
+      <!-- Columna derecha: controles y resultados -->
+      <aside class="panel">
+        <section aria-labelledby="mix-title">
+          <h2 id="mix-title">Mezclar</h2>
+          <div class="row">
+            <label class="field">
+              <span>Giros</span>
+              <select id="scramble-length">
+                <option>1</option><option>2</option><option>3</option><option>4</option>
+                <option selected>5</option><option>6</option><option>7</option><option>8</option>
+              </select>
+            </label>
+            <button type="button" id="scramble-btn" class="primary">Mezclar</button>
+            <button type="button" id="reset-btn" class="ghost">Reiniciar</button>
+          </div>
+        </section>
+
+        <section aria-labelledby="manual-title">
+          <h2 id="manual-title">Girar a mano</h2>
+          <p class="hint">Un cuarto de vuelta en sentido horario; con ′ gira al revés.</p>
+          <div class="manual" id="manual-moves"></div>
+        </section>
+
+        <section aria-labelledby="solve-title">
+          <h2 id="solve-title">Resolver</h2>
+          <div class="row">
+            <button type="button" id="solve-bfs" class="primary">Resolver con BFS</button>
+            <button type="button" id="solve-astar" class="primary">Resolver con A*</button>
+            <button type="button" id="solve-both" class="ghost">Comparar</button>
+            <button type="button" id="cancel-btn" class="ghost" hidden>Cancelar búsqueda</button>
+          </div>
+          <p class="status" id="status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section aria-labelledby="results-title">
+          <h2 id="results-title">Resultados</h2>
+          <div class="results-wrap">
+          <table class="results">
+            <thead>
+              <tr>
+                <th scope="col">Algoritmo</th>
+                <th scope="col">Resultado</th>
+                <th scope="col" class="num">Giros</th>
+                <th scope="col" class="num">Nodos expandidos</th>
+                <th scope="col" class="num">Tiempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr id="result-bfs">
+                <th scope="row">BFS <small>búsqueda ciega</small></th>
+                <td data-cell="status">Sin ejecutar</td>
+                <td data-cell="cost" class="num">–</td>
+                <td data-cell="nodes" class="num">–</td>
+                <td data-cell="time" class="num">–</td>
+              </tr>
+              <tr id="result-astar">
+                <th scope="row">A* <small>búsqueda informada</small></th>
+                <td data-cell="status">Sin ejecutar</td>
+                <td data-cell="cost" class="num">–</td>
+                <td data-cell="nodes" class="num">–</td>
+                <td data-cell="time" class="num">–</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+          <p class="summary" id="summary"></p>
+          <p class="hint" id="limits-note"></p>
+        </section>
+      </aside>
+    </main>
+  </div>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
