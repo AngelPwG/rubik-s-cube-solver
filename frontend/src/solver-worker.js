@@ -1,0 +1,95 @@
+/**
+ * solver-worker.js — Web Worker que ejecuta las búsquedas.
+ *
+ * Una búsqueda puede tardar varios segundos. Si corriera en el hilo principal,
+ * la página se congelaría (no se podría girar el cubo ni cancelar). Por eso
+ * corre aquí, en un hilo aparte, y se comunica con la página por mensajes.
+ *
+ * Motor de búsqueda:
+ *   1. Intenta cargar el módulo WebAssembly generado por scripts/build-wasm.sh
+ *      (frontend/public/wasm/solver.js) y usar su función solve_cube().
+ *   2. Si el módulo no existe o todavía no exporta solve_cube(), usa el BFS y
+ *      A* de respaldo escritos en JavaScript (search-js.js).
+ *
+ * Mensajes que recibe:  { id, algorithm: 'bfs' | 'astar', key, limits }
+ * Mensajes que envía:   { type: 'ready', engine }
+ *                       { type: 'result', id, result }
+ */
+import { solveWithJs } from './search-js.js';
+
+/** Código numérico de cada algoritmo en la función C++ solve_cube(). */
+const ALGORITHM_CODE = { bfs: 0, astar: 1 };
+
+/** Módulo de Emscripten ya inicializado, o null si se usa el respaldo en JS. */
+let wasmModule = null;
+
+/**
+ * Intenta cargar el solver en WebAssembly.
+ * @returns {Promise<'wasm' | 'js'>} el motor que quedó activo
+ */
+async function loadEngine() {
+  try {
+    const { default: createModule } = await import('../public/wasm/solver.js');
+    const module = await createModule();
+    // El esqueleto inicial solo exporta skeleton_version(); sin solve_cube() no sirve.
+    if (typeof module._solve_cube !== 'function') return 'js';
+    wasmModule = module;
+    return 'wasm';
+  } catch {
+    return 'js'; // el archivo no existe todavía o no se pudo inicializar
+  }
+}
+
+/**
+ * Llama al solver de C++ y convierte su respuesta al formato de la interfaz.
+ * Contrato (ver docs/frontend-contract.md):
+ *   const char* solve_cube(const char* stateKey, int algorithm,
+ *                          int maxExpandedNodes, double maxTimeMs);
+ * Devuelve un JSON: {"status","moves","expandedNodes","searchTimeMs","solutionCost"}
+ */
+function solveWithWasm(algorithm, key, limits) {
+  const json = wasmModule.ccall(
+    'solve_cube',
+    'string',
+    ['string', 'number', 'number', 'number'],
+    [key, ALGORITHM_CODE[algorithm], limits.maxExpandedNodes, limits.maxTimeMs],
+  );
+  const raw = JSON.parse(json);
+  if (raw.status === 'error') throw new Error(raw.message || 'solve_cube devolvió un error');
+  const moves = raw.moves ? raw.moves.trim().split(/\s+/).filter(Boolean) : [];
+  return {
+    status: raw.status,
+    moves,
+    expandedNodes: Number(raw.expandedNodes),
+    searchTimeMs: Number(raw.searchTimeMs),
+    solutionCost: Number(raw.solutionCost ?? moves.length),
+  };
+}
+
+const enginePromise = loadEngine().then((engine) => {
+  self.postMessage({ type: 'ready', engine });
+  return engine;
+});
+
+self.onmessage = async (event) => {
+  const { id, algorithm, key, limits } = event.data;
+  await enginePromise;
+
+  let result;
+  if (wasmModule) {
+    try {
+      result = { ...solveWithWasm(algorithm, key, limits), engine: 'wasm' };
+    } catch (error) {
+      // Si el Wasm falla, la interfaz sigue funcionando y avisa qué pasó.
+      result = {
+        ...solveWithJs(algorithm, key, limits),
+        engine: 'js',
+        warning: `El solver de WebAssembly falló (${error.message}). Se usó el respaldo en JavaScript.`,
+      };
+    }
+  } else {
+    result = { ...solveWithJs(algorithm, key, limits), engine: 'js' };
+  }
+
+  self.postMessage({ type: 'result', id, result: { ...result, algorithm } });
+};

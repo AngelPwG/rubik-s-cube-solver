@@ -1,2 +1,510 @@
-body { font-family: system-ui, sans-serif; margin: 2rem; }
-main { max-width: 64rem; margin: auto; }
+/*
+ * styles.css — Estilos de la interfaz.
+ *
+ * Idea visual: el cubo es lo único con color saturado; todo lo demás es
+ * neutro (gris azulado, blanco y azul marino) para que los seis colores de
+ * las caras se lean sin competencia. Los botones de giro imitan un sticker
+ * y llevan una franja con el color de la cara que mueven.
+ *
+ * La tipografía es Rubik (licencia OFL), servida desde vendor/ para que la
+ * página funcione sin conexión a internet.
+ */
+
+@font-face {
+  font-family: 'Rubik';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('../vendor/fonts/rubik-latin-wght-normal.woff2') format('woff2');
+}
+
+:root {
+  --table: #e7ebf0;      /* fondo: la "mesa" donde está el cubo */
+  --table-light: #f7f9fb;
+  --surface: #ffffff;    /* panel de controles */
+  --ink: #101b33;        /* texto principal (azul marino) */
+  --ink-soft: #56637c;   /* texto secundario */
+  --line: #d3dae4;       /* líneas divisorias y bordes */
+  --plastic: #1b1f27;    /* plástico negro del cubo */
+  --action: #1e5fcf;     /* botones principales (azul del cubo) */
+  --action-dark: #174ba6;
+  --focus: #f2801d;      /* anillo de foco (naranja del cubo) */
+  --ok: #18794a;
+  --warn: #b4530b;
+  --bad: #b3261e;
+  --panel-width: 470px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--table);
+  color: var(--ink);
+  font-family: 'Rubik', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1, h2, p { margin: 0; }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ---------- Encabezado ---------- */
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 32px;
+  flex-wrap: wrap;
+  padding: 18px 28px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.masthead h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+.masthead-sub {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.engine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.engine::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.engine[data-engine='wasm']::before { background: var(--ok); }
+.engine[data-engine='js']::before { background: var(--focus); }
+
+/* ---------- Distribución general ---------- */
+
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-width);
+  min-height: 0;
+}
+
+.stage-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---------- Escenario del cubo ---------- */
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 400px;
+  background: radial-gradient(ellipse at 50% 42%, var(--table-light) 0%, var(--table) 68%);
+}
+
+.cube-view {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.cube-view:active { cursor: grabbing; }
+.cube-view canvas { display: block; }
+
+.cube-view.no-webgl {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: var(--ink-soft);
+  text-align: center;
+  cursor: default;
+}
+
+.scramble {
+  position: absolute;
+  top: 18px;
+  left: 28px;
+  right: 28px;
+  font-size: 17px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.camera-reset {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+}
+
+/* Mapa 2D del cubo desdoblado */
+.net {
+  position: absolute;
+  left: 24px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  grid-template-rows: repeat(3, auto);
+  gap: 3px;
+  pointer-events: none;
+}
+
+.net-face {
+  display: grid;
+  grid-template-columns: repeat(3, 13px);
+  grid-template-rows: repeat(3, 13px);
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--plastic);
+}
+
+.net-cell {
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  color: rgba(16, 27, 51, 0.75);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.net-cell[data-color='B'],
+.net-cell[data-color='R'],
+.net-cell[data-color='G'] { color: rgba(255, 255, 255, 0.92); }
+
+/* ---------- Reproductor de la solución ---------- */
+
+.playback {
+  padding: 16px 28px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--table-light);
+}
+
+.playback-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.step-count {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.solution-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: paso;
+}
+
+.moves li {
+  counter-increment: paso;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+/* El número de paso va debajo de cada giro: la solución sí es una secuencia. */
+.moves li::after {
+  content: counter(paso);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  max-width: 62ch;
+}
+
+/* ---------- Botones ---------- */
+
+button, select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.primary {
+  background: var(--action);
+  color: #fff;
+}
+.primary:hover:not(:disabled) { background: var(--action-dark); }
+
+.ghost {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.ghost:hover:not(:disabled) { border-color: var(--ink-soft); }
+
+.ghost[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+select {
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/* Botón de giro: un "sticker" con la franja del color de la cara que mueve. */
+.move-chip {
+  position: relative;
+  width: 46px;
+  min-height: 46px;
+  padding: 0 0 7px;
+  border-color: var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  font-size: 18px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.move-chip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  background: var(--face);
+  border-top: 1px solid rgba(16, 27, 51, 0.22);
+}
+
+.move-chip:hover:not(:disabled) { border-color: var(--ink-soft); }
+
+/* En la solución: giros ya aplicados y giro actual. */
+.moves .move-chip:disabled { opacity: 1; cursor: default; }
+.moves .move-chip[data-state='done'] {
+  background: var(--table);
+  color: var(--ink-soft);
+}
+.moves .move-chip[aria-current='step'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+/* ---------- Panel de controles ---------- */
+
+.panel {
+  min-width: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.panel > section {
+  padding: 16px 24px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.panel > section:last-child { border-bottom: 0; }
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+/* Giros manuales agrupados por cara: R R′ | L L′ | U U′ ... */
+.manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 12px;
+}
+
+.pair {
+  display: flex;
+  gap: 6px;
+}
+
+.status {
+  min-height: 1.45em;
+  margin-top: 12px;
+  font-weight: 500;
+}
+
+/* ---------- Resultados ---------- */
+
+/* Si la tabla no cabe (pantallas muy angostas), se desliza dentro de su caja. */
+.results-wrap { overflow-x: auto; }
+
+.results {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.results th,
+.results td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.results thead th {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  vertical-align: bottom;
+}
+
+.results .num { text-align: right; white-space: nowrap; }
+.results thead .num { white-space: normal; }
+
+.results tbody th {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  padding-left: 9px;
+}
+
+.results tbody th small {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* La fila marcada es la solución que está cargada en el reproductor. */
+.results tr.is-shown th { border-left-color: var(--action); }
+
+.results tr[data-status='solved'] [data-cell='status'] { color: var(--ok); font-weight: 500; }
+.results tr[data-status='limit'] [data-cell='status'] { color: var(--warn); font-weight: 500; }
+.results tr[data-status='invalid'] [data-cell='status'],
+.results tr[data-status='exhausted'] [data-cell='status'] { color: var(--bad); font-weight: 500; }
+.results tr[data-status='idle'] td,
+.results tr[data-status='running'] td { color: var(--ink-soft); }
+
+.summary {
+  margin-top: 14px;
+  font-weight: 500;
+  max-width: 44ch;
+}
+.summary:empty { display: none; }
+
+[hidden] { display: none !important; }
+
+/* ---------- Pantallas angostas ---------- */
+
+@media (max-width: 980px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { flex: none; height: 62vh; min-height: 360px; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .masthead, .playback { padding-left: 18px; padding-right: 18px; }
+  .panel > section { padding-left: 18px; padding-right: 18px; }
+  .scramble { left: 18px; right: 18px; font-size: 15px; }
+  .net { left: 14px; bottom: 14px; }
+  .net-face { grid-template-columns: repeat(3, 10px); grid-template-rows: repeat(3, 10px); }
+  .camera-reset { right: 14px; bottom: 14px; }
+  .speed { margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+  .results { font-size: 13px; }
+  .results th, .results td { padding: 7px 3px; }
+  .results thead th { font-size: 12px; }
+  .results tbody th { font-size: 14px; padding-left: 6px; }
+}
+
+@media (min-width: 981px) {
+  /* En escritorio todo cabe en una pantalla: útil para las capturas del reporte. */
+  .app { height: 100vh; }
+  .layout { overflow: hidden; }
+}
