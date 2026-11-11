@@ -29,14 +29,28 @@ let wasmModule = null;
  */
 async function loadEngine() {
   try {
-    const { default: createModule } = await import('../public/wasm/solver.js');
-    const module = await createModule();
-    // El esqueleto inicial solo exporta skeleton_version(); sin solve_cube() no sirve.
-    if (typeof module._solve_cube !== 'function') return 'js';
+    // Cargar el JS y el Wasm con una URL nueva en cada inicio del worker.
+    // Evita combinar archivos antiguos de la cache con otra compilacion.
+    const version = Date.now().toString();
+    const directory = new URL('../public/wasm/', import.meta.url);
+    const entry = new URL('solver.js', directory);
+    entry.searchParams.set('v', version);
+    const { default: createModule } = await import(entry.href);
+    const module = await createModule({
+      locateFile(file) {
+        const url = new URL(file, directory);
+        url.searchParams.set('v', version);
+        return url.href;
+      },
+    });
+    if (typeof module._solve_cube !== 'function') {
+      throw new Error('El modulo WebAssembly no exporta solve_cube');
+    }
     wasmModule = module;
     return 'wasm';
-  } catch {
-    return 'js'; // el archivo no existe todavía o no se pudo inicializar
+  } catch (error) {
+    console.error('No se pudo cargar el motor C++/WebAssembly:', error);
+    return 'js';
   }
 }
 

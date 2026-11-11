@@ -34,7 +34,9 @@ export class SolverClient {
 
   /** Crea el Web Worker y conecta sus mensajes. */
   startWorker() {
-    this.worker = new Worker(new URL('./solver-worker.js', import.meta.url), { type: 'module' });
+    const workerUrl = new URL('./solver-worker.js', import.meta.url);
+    workerUrl.searchParams.set('v', Date.now().toString());
+    this.worker = new Worker(workerUrl, { type: 'module' });
     this.worker.onmessage = (event) => {
       const message = event.data;
       if (message.type === 'ready') {
