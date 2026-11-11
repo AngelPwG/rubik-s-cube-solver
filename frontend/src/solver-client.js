@@ -42,6 +42,7 @@ export class SolverClient {
       } else if (message.type === 'result') {
         const finish = this.pending.get(message.id);
         this.pending.delete(message.id);
+        if (message.result.engine) this.onEngineReady(message.result.engine);
         if (finish) finish(message.result);
       }
     };
