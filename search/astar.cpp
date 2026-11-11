@@ -23,20 +23,6 @@ SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
     while (!open.empty()) {
         const auto current = open.top().index;
         open.pop();
-<<<<<<< HEAD
-
-        Cube curCube = nodes[idx].cube;
-        int curG = nodes[idx].g;
-        std::string key = stateKey(curCube);
-        if (closed.count(key)) continue;
-        closed.insert(key);
-        if(isSolved(curCube)) {
-            std::vector<Move> path;
-            for(int i = idx; nodes[i].parent != -1; i = nodes[i].parent)
-                path.push_back(nodes[i].move);
-            std::reverse(path.begin(), path.end());
-            return path;
-=======
         const Node node = nodes[current];
         const auto key = stateKey(node.cube);
         if (node.g != bestG.at(key)) continue;
@@ -44,7 +30,6 @@ SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
             detail::reconstructPath(result, nodes, current);
             result.searchTimeMs = detail::elapsedMs(start);
             return result;
->>>>>>> main
         }
         if (detail::limitReached(result, limits, start)) {
             result.searchTimeMs = detail::elapsedMs(start);
@@ -68,8 +53,3 @@ SearchResult solveAStar(const Cube& initial, const SearchLimits& limits) {
     return result;
 }
 }
-<<<<<<< HEAD
-
-}
-=======
->>>>>>> main
